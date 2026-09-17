@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.Kesher" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#F59E0B</item>
+        <item name="colorPrimaryVariant">#0B1220</item>
+        <item name="colorOnPrimary">#111111</item>
+        <item name="android:statusBarColor">#070B14</item>
+        <item name="android:navigationBarColor">#070B14</item>
+        <item name="android:windowBackground">#070B14</item>
+        <item name="android:textColor">#E8EEFC</item>
+    </style>
+</resources>

@@ -1,0 +1,37 @@
+קשר — מערכת PTT ארגונית
+========================
+
+מה צריך במחשב/שרת הבית
+- Docker Desktop (Windows/Mac) או Docker Engine + Compose (Linux)
+
+הרצה
+1. חלצו את ה-ZIP לתיקייה, למשל C:\kesher או ~/kesher
+2. פתחו טרמינל בתוך תיקיית kesher
+3. הריצו:
+
+   docker compose up -d --build
+
+4. בדפדפן:
+
+   http://127.0.0.1:8080
+   או מהטלפון באותה רשת Wi‑Fi:
+   http://IP-של-המחשב:8080
+
+כניסה ראשונה
+  מנהל:      admin        / KesherAdmin!23
+  מוקד:      dispatcher   / KesherDisp!23
+  ניידת:     siur1        / KesherField!23
+
+שנו סיסמאות במסך הניהול אחרי הכניסה הראשונה.
+
+טלפונים
+- מכשיר קשר בדפדפן: http://IP:8080/radio
+- אפליקציית אנדרואיד: פתחו את תיקיית android ב-Android Studio
+  ובמסך הכניסה הזינו http://IP:8080
+
+עצירה
+  docker compose down
+
+בעיות נפוצות
+- פורט 8080 תפוס: שנו ב-docker-compose.yml את "8080:80" ל-"8081:80"
+- מיקרופון בטלפון בדפדפן דורש HTTPS; באפליקציית אנדרואיד HTTP ברשת הבית עובד

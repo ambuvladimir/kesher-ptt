@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  color     String   @default("#3b82f6")
+  createdAt DateTime @default(now())
+  users     User[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  callSign     String
+  role         String
+  unitId       String?
+  unit         Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  phone        String    @default("")
+  isActive     Boolean   @default(true)
+  lat          Float?
+  lng          Float?
+  accuracy     Float?
+  heading      Float?
+  speed        Float?
+  locationAt   DateTime?
+  status       String    @default("offline")
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+  memberships  ChannelMember[]
+  locations    LocationPing[]
+  auditLogs    AuditLog[]
+  pttLogs      PttLog[]
+  messages     Message[]
+}
+
+model Channel {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  kind        String
+  description String   @default("")
+  color       String   @default("#f59e0b")
+  isActive    Boolean  @default(true)
+  maxTalkSec  Int      @default(45)
+  createdAt   DateTime @default(now())
+  members     ChannelMember[]
+  pttLogs     PttLog[]
+  messages    Message[]
+}
+
+model ChannelMember {
+  id        String  @id @default(cuid())
+  userId    String
+  channelId String
+  canTalk   Boolean @default(true)
+  canListen Boolean @default(true)
+  isPrimary Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+}
+
+model LocationPing {
+  id        String   @id @default(cuid())
+  userId    String
+  lat       Float
+  lng       Float
+  accuracy  Float?
+  heading   Float?
+  speed     Float?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model PttLog {
+  id         String    @id @default(cuid())
+  channelId  String
+  userId     String
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  durationMs Int?
+  channel    Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  body      String
+  kind      String   @default("text")
+  createdAt DateTime @default(now())
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
