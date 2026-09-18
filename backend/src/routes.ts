@@ -19,7 +19,7 @@ const loginSchema = z.object({
 
 const userSchema = z.object({
   username: z.string().min(2),
-  password: z.string().min(6).optional(),
+  password: z.string().min(6).optional().or(z.literal("")),
   displayName: z.string().min(1),
   callSign: z.string().min(1),
   role: z.enum(["admin", "dispatcher", "supervisor", "driver", "field"]),

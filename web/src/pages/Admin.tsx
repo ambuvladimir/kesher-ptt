@@ -376,7 +376,7 @@ function UserModal({
             try {
               await onSave({
                 username: form.username,
-                password: form.password,
+                password: form.password?.trim() ? form.password : undefined,
                 displayName: form.displayName,
                 callSign: form.callSign,
                 role: form.role,

@@ -14,6 +14,19 @@ async function main(): Promise<void> {
   await seedIfEmpty();
 
   const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
+    const text = typeof body === "string" ? body : "";
+    if (!text.trim()) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(text));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
   await app.register(cors, { origin: true });
   await app.register(rateLimit, {
     max: 120,
