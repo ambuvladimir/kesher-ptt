@@ -1,4 +1,4 @@
-export type Role = "admin" | "dispatcher" | "supervisor" | "field";
+export type Role = "admin" | "dispatcher" | "supervisor" | "driver" | "field";
 
 export type Membership = {
   channelId: string;

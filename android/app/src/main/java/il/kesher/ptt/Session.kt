@@ -21,9 +21,9 @@ class Session(ctx: Context) {
         get() = prefs.getString("callSign", "") ?: ""
         set(value) { prefs.edit().putString("callSign", value).apply() }
 
-    var displayName: String
-        get() = prefs.getString("displayName", "") ?: ""
-        set(value) { prefs.edit().putString("displayName", value).apply() }
+    var userId: String
+        get() = prefs.getString("userId", "") ?: ""
+        set(value) { prefs.edit().putString("userId", value).apply() }
 
     fun clearAuth() {
         prefs.edit().remove("token").apply()

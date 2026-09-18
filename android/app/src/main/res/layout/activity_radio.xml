@@ -32,11 +32,36 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <TextView
+        android:text="שיחה קבוצתית"
+        android:textColor="@color/muted"
+        android:paddingStart="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
         <LinearLayout
             android:id="@+id/channelRow"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:text="שיחה אישית"
+        android:textColor="@color/muted"
+        android:paddingStart="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <LinearLayout
+            android:id="@+id/contactRow"
             android:orientation="horizontal"
             android:padding="8dp"
             android:layout_width="wrap_content"

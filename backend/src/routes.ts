@@ -10,6 +10,7 @@ import {
   type Role,
 } from "./auth.js";
 import { audit, loadUser, publicUser } from "./util.js";
+import { getOrCreateDirect } from "./direct.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -21,7 +22,7 @@ const userSchema = z.object({
   password: z.string().min(6).optional(),
   displayName: z.string().min(1),
   callSign: z.string().min(1),
-  role: z.enum(["admin", "dispatcher", "supervisor", "field"]),
+  role: z.enum(["admin", "dispatcher", "supervisor", "driver", "field"]),
   unitId: z.string().nullable().optional(),
   phone: z.string().optional(),
   isActive: z.boolean().optional(),
@@ -46,7 +47,7 @@ const unitSchema = z.object({
 const channelSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1),
-  kind: z.enum(["talkgroup", "dispatch", "emergency", "broadcast"]),
+  kind: z.enum(["talkgroup", "dispatch", "emergency", "broadcast", "direct"]),
   description: z.string().optional(),
   color: z.string().optional(),
   isActive: z.boolean().optional(),
@@ -127,16 +128,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/users", async (req) => {
     const auth = await requireUser(req);
-    requireRole(auth, ["admin", "dispatcher", "supervisor"]);
     const users = await prisma.user.findMany({
       include: { unit: true, memberships: { include: { channel: true } } },
       orderBy: { callSign: "asc" },
     });
-    const filtered =
-      auth.role === "supervisor"
-        ? users.filter((u) => u.unitId === auth.unitId || u.id === auth.id)
-        : users;
-    return filtered.map(publicUser);
+    if (auth.role === "admin") return users.map(publicUser);
+    return users.filter((u) => u.isActive).map(publicUser);
   });
 
   app.post("/api/users", async (req, reply) => {
@@ -234,7 +231,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       },
       orderBy: { name: "asc" },
     });
-    if (auth.role === "admin" || auth.role === "dispatcher") return channels;
+    if (auth.role === "admin" || auth.role === "dispatcher" || auth.role === "supervisor") return channels;
     const mine = new Set(
       (
         await prisma.channelMember.findMany({
@@ -305,6 +302,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await prisma.channel.delete({ where: { id } });
     await audit(auth.id, "channel.delete", id);
     return { ok: true };
+  });
+
+  app.post("/api/direct", async (req, reply) => {
+    const auth = await requireUser(req);
+    const body = z.object({ peerId: z.string().min(1) }).parse(req.body);
+    const { channel, peer } = await getOrCreateDirect(auth.id, body.peerId);
+    await audit(auth.id, "direct.open", peer.callSign);
+    return channel;
   });
 
   app.get("/api/locations", async (req) => {

@@ -37,6 +37,7 @@ class LoginActivity : AppCompatActivity() {
                         session.token = token
                         session.callSign = profile.optString("callSign")
                         session.displayName = profile.optString("displayName")
+                        session.userId = profile.optString("id")
                         startActivity(Intent(this, HomeActivity::class.java))
                         finish()
                     }

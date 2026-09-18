@@ -58,6 +58,9 @@ export function LoginPage() {
           <button className="btn primary" disabled={busy} type="submit">
             {busy ? "מתחבר..." : "כניסה"}
           </button>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+            מנהל: admin · דיספאצר: dispatcher · נהג: driver1
+          </p>
         </div>
       </form>
     </div>

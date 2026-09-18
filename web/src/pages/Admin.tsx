@@ -98,7 +98,7 @@ export function AdminPage() {
           <div className="toolbar" style={{ marginBottom: 12, justifyContent: "space-between" }}>
             <input className="input" style={{ maxWidth: 280 }} placeholder="חיפוש לפי שם, קריאה, משתמש..." value={q} onChange={(e) => setQ(e.target.value)} />
             <button className="btn primary" onClick={() => setEditingUser({
-              role: "field",
+              role: "driver",
               isActive: true,
               channelIds: channels.map((c) => ({
                 channelId: c.id,
@@ -328,11 +328,10 @@ function UserModal({
           <div><label>אות קריאה</label><input className="input" value={form.callSign ?? ""} onChange={(e) => set("callSign", e.target.value)} /></div>
           <div>
             <label>תפקיד</label>
-            <select className="input" value={form.role ?? "field"} onChange={(e) => set("role", e.target.value)}>
-              <option value="admin">מנהל</option>
+            <select className="input" value={form.role === "field" ? "driver" : (form.role ?? "driver")} onChange={(e) => set("role", e.target.value)}>
+              <option value="admin">מנהל מערכת</option>
               <option value="dispatcher">דיספאצר</option>
-              <option value="supervisor">אחמ״ש</option>
-              <option value="field">שטח</option>
+              <option value="driver">נהג</option>
             </select>
           </div>
           <div>
@@ -425,7 +424,7 @@ function ChannelModal({
           <div>
             <label>סוג</label>
             <select className="input" value={form.kind ?? "talkgroup"} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-              <option value="talkgroup">קבוצת דיבור</option>
+              <option value="talkgroup">שיחה קבוצתית</option>
               <option value="dispatch">מוקד</option>
               <option value="emergency">חירום</option>
               <option value="broadcast">שידור כללי</option>
@@ -471,8 +470,8 @@ function ChannelModal({
 }
 
 function roleHe(role: string) {
-  return { admin: "מנהל", dispatcher: "דיספאצר", supervisor: "אחמ״ש", field: "שטח" }[role] ?? role;
+  return { admin: "מנהל מערכת", dispatcher: "דיספאצר", supervisor: "דיספאצר", driver: "נהג", field: "נהג" }[role] ?? role;
 }
 function kindHe(kind: string) {
-  return { talkgroup: "קבוצה", dispatch: "מוקד", emergency: "חירום", broadcast: "שידור" }[kind] ?? kind;
+  return { talkgroup: "קבוצתי", dispatch: "מוקד", emergency: "חירום", broadcast: "שידור", direct: "אישי" }[kind] ?? kind;
 }

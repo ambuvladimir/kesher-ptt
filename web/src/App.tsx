@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { api, type User } from "./api";
 import { COMPANY } from "./brand";
 import { useAuth } from "./store";
+import { isAdmin, isDispatcher, roleLabel } from "./roles";
 import { disconnectSocket } from "./socket";
 
 export function AppShell() {
@@ -22,8 +23,8 @@ export function AppShell() {
 
   if (!token) return <Navigate to="/login" replace />;
 
-  const canDispatch = user?.role === "admin" || user?.role === "dispatcher" || user?.role === "supervisor";
-  const canAdmin = user?.role === "admin";
+  const canDispatch = isDispatcher(user?.role);
+  const canAdmin = isAdmin(user?.role);
 
   return (
     <div className="app-shell">
@@ -32,7 +33,7 @@ export function AppShell() {
           <img className="brand-logo" src={COMPANY.logo} alt={COMPANY.name} />
           <div>
             <h1>{COMPANY.name}</h1>
-            <p>{COMPANY.product} · {user?.callSign ?? "…"}</p>
+            <p>{COMPANY.product} · {roleLabel(user?.role)} · {user?.callSign ?? "…"}</p>
           </div>
         </button>
         <NavLink to="/dashboard" className={({ isActive }) => `nav-btn ${isActive ? "home-active" : ""}`}>
@@ -73,7 +74,7 @@ export function AppShell() {
             <Home size={16} /> דאשבורד
           </button>
           <div style={{ color: "var(--muted)", fontSize: 13 }}>
-            {user?.displayName} · {user?.callSign}
+            {roleLabel(user?.role)} · {user?.displayName} · {user?.callSign}
           </div>
         </header>
         <main className="main">

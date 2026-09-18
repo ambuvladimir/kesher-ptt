@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import type { FastifyRequest } from "fastify";
 import { prisma, config } from "./config.js";
 
-export type Role = "admin" | "dispatcher" | "supervisor" | "field";
+export type Role = "admin" | "dispatcher" | "supervisor" | "driver" | "field";
 
 export type AuthUser = {
   id: string;
@@ -61,7 +61,13 @@ export async function requireUser(req: FastifyRequest): Promise<AuthUser> {
 }
 
 export function requireRole(user: AuthUser, roles: Role[]): void {
-  if (!roles.includes(user.role)) {
+  const expanded = new Set<string>(roles);
+  if (roles.includes("driver") || roles.includes("field")) {
+    expanded.add("driver");
+    expanded.add("field");
+  }
+  if (roles.includes("dispatcher")) expanded.add("supervisor");
+  if (!expanded.has(user.role)) {
     throw Object.assign(new Error("אין הרשאה לפעולה זו"), { statusCode: 403 });
   }
 }

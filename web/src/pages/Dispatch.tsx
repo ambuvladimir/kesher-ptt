@@ -8,6 +8,7 @@ import { pttAudio } from "../audio";
 import { connectSocket } from "../socket";
 import { useAuth } from "../store";
 import { radioTones } from "../tones";
+import { roleLabel } from "../roles";
 
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: string })._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -78,6 +79,14 @@ export function DispatchPage() {
       radioTones.error();
       setAlert(p.reason || "הערוץ תפוס");
     };
+    const onDirect = (p: { channel: { id: string; name: string }; from: { id: string; callSign: string } }) => {
+      radioTones.start();
+      setChannels((prev) => (prev.some((c) => c.id === p.channel.id) ? prev : [...prev, p.channel as Channel]));
+      setSelected(p.channel.id);
+      socket.emit("channel:join", { channelId: p.channel.id });
+      socket.emit("channel:select", { channelId: p.channel.id });
+      setAlert(`שיחה אישית: ${p.channel.name}`);
+    };
 
     socket.on("location:broadcast", onLoc);
     socket.on("presence:update", onPresence);
@@ -87,6 +96,7 @@ export function DispatchPage() {
     socket.on("message:new", onMsg);
     socket.on("emergency:alert", onEmergency);
     socket.on("ptt:denied", onDenied);
+    socket.on("direct:open", onDirect);
     socket.on("ptt:granted", async () => {
       radioTones.start();
       setTalking(true);
@@ -107,6 +117,7 @@ export function DispatchPage() {
       socket.off("message:new", onMsg);
       socket.off("emergency:alert", onEmergency);
       socket.off("ptt:denied", onDenied);
+      socket.off("direct:open", onDirect);
     };
   }, [token, selected, user?.id]);
 
@@ -189,12 +200,15 @@ export function DispatchPage() {
               <span style={{ color: "var(--muted)" }}>{speaker || "שקט בקו"}</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-              {channels.map((c) => (
+              {channels.filter((c) => c.kind !== "direct").map((c) => (
                 <button key={c.id} className={`ch-pill ${c.id === selected ? "active" : ""}`} onClick={() => setSelected(c.id)}>
                   {c.name}
                 </button>
               ))}
             </div>
+            {current?.kind === "direct" ? (
+              <div className="talking-banner">שיחה אישית פתוחה: {current.name}</div>
+            ) : null}
             <button
               className={`btn primary ${talking ? "live" : ""}`}
               style={{ width: "100%", padding: 16, fontSize: 18 }}
@@ -216,8 +230,16 @@ export function DispatchPage() {
                   <span>
                     <span className={`dot ${u.status === "emergency" ? "em" : u.status === "talking" ? "talk" : u.status === "offline" ? "" : "on"}`} />
                     {" "}{u.callSign} · {u.displayName}
+                    <span style={{ color: "var(--muted)", fontSize: 12 }}> · {roleLabel(u.role)}</span>
                   </span>
-                  <span style={{ color: "var(--muted)", fontSize: 12 }}>{statusHe(u.status)}</span>
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ color: "var(--muted)", fontSize: 12 }}>{statusHe(u.status)}</span>
+                    {u.id !== user?.id ? (
+                      <button className="btn ghost" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => connectSocket(token!).emit("direct:open", { peerId: u.id })}>
+                        אישי
+                      </button>
+                    ) : null}
+                  </span>
                 </div>
               ))}
             </div>

@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 data class Channel(val id: String, val name: String, val code: String, val kind: String)
+data class Contact(val id: String, val name: String, val callSign: String, val role: String, val status: String)
 
 object Api {
     fun login(base: String, username: String, password: String): JSONObject {
@@ -26,6 +27,23 @@ object Api {
         for (i in 0 until items.length()) {
             val o = items.getJSONObject(i)
             list += Channel(o.getString("id"), o.getString("name"), o.getString("code"), o.getString("kind"))
+        }
+        return list
+    }
+
+    fun users(base: String, token: String): List<Contact> {
+        val json = request(base, "/api/users", "GET", null, token)
+        val items = json.optJSONArray("items") ?: JSONArray()
+        val list = mutableListOf<Contact>()
+        for (i in 0 until items.length()) {
+            val o = items.getJSONObject(i)
+            list += Contact(
+                o.getString("id"),
+                o.optString("displayName"),
+                o.optString("callSign"),
+                o.optString("role"),
+                o.optString("status")
+            )
         }
         return list
     }

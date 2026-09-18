@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Map, Radio, Shield, Users } from "lucide-react";
 import { api, type Channel, type User } from "../api";
 import { COMPANY } from "../brand";
+import { isAdmin, isDispatcher, isDriver, roleLabel } from "../roles";
 import { useAuth } from "../store";
 
 export function DashboardPage() {
@@ -23,8 +24,8 @@ export function DashboardPage() {
 
   const online = users.filter((u) => u.status && u.status !== "offline").length;
   const emergency = users.filter((u) => u.status === "emergency").length;
-  const canDispatch = user?.role === "admin" || user?.role === "dispatcher" || user?.role === "supervisor";
-  const canAdmin = user?.role === "admin";
+  const canDispatch = isDispatcher(user?.role);
+  const canAdmin = isAdmin(user?.role);
 
   return (
     <div>
@@ -34,15 +35,15 @@ export function DashboardPage() {
           <div style={{ color: "var(--muted)", fontSize: 13 }}>{COMPANY.product}</div>
           <h2 style={{ margin: "4px 0" }}>{COMPANY.name}</h2>
           <p style={{ margin: 0, color: "var(--muted)" }}>
-            שלום {user?.displayName} ({user?.callSign}) — בחרו מסך עבודה
+            שלום {user?.displayName} ({user?.callSign}) — {roleLabel(user?.role)}
           </p>
         </div>
       </div>
 
       <div className="grid-4" style={{ marginBottom: 16 }}>
-        <div className="stat"><span>מחוברים</span><b>{online || "—"}</b></div>
-        <div className="stat"><span>ערוצים</span><b>{channels.length}</b></div>
-        <div className="stat"><span>משתמשים</span><b>{users.length || "—"}</b></div>
+        <div className="stat"><span>נהגים</span><b>{users.filter((u) => isDriver(u.role)).length || "—"}</b></div>
+        <div className="stat"><span>דיספאצרים</span><b>{users.filter((u) => u.role === "dispatcher" || u.role === "supervisor").length || "—"}</b></div>
+        <div className="stat"><span>מנהלים</span><b>{users.filter((u) => isAdmin(u.role)).length || "—"}</b></div>
         <div className="stat"><span>חירום פעיל</span><b style={{ color: emergency ? "var(--brand)" : undefined }}>{emergency}</b></div>
       </div>
 
