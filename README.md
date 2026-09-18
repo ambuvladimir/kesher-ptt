@@ -37,6 +37,17 @@ docker compose up -d --build
 
 פתחו בדפדפן: `http://IP-של-השרת:8080`
 
+### עדכון מ-GitHub בלי למחוק נתונים
+
+בתיקיית הפרויקט בשרת (אחרי `git clone`):
+
+```bash
+git pull origin main
+docker compose up -d --build
+```
+
+לא להריץ `docker compose down -v` — זה מוחק את המשתמשים, הערוצים וההגדרות.
+
 ### חשבונות דמו (נוצרים אוטומטית בהפעלה ראשונה)
 
 | משתמש | סיסמה | תפקיד |
