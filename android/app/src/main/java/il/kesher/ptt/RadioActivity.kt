@@ -57,8 +57,10 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         val socket = RadioBus.connect(session.serverUrl, token)
         socket.on("ptt:granted") {
             talking = true
+            RadioTones.start()
+            RadioBus.audio.resetPlayback()
             RadioBus.audio.startCapture { bytes ->
-                socket.emit("ptt:audio", bytes, JSONObject().put("channelId", selected))
+                socket.emit("ptt:audio", selected, bytes)
             }
             runOnUiThread { binding.statusText.text = "אתה משדר" }
         }
@@ -69,30 +71,38 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         })
         socket.on("ptt:start", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
-            if (o.optString("channelId") == selected) {
-                RadioTones.start()
-                runOnUiThread { binding.statusText.text = "באוויר: ${o.optString("callSign")}" }
+            if (o.optString("channelId") != selected) return@Listener
+            val fromSelf = o.optString("userId") == session.userId
+            runOnUiThread { binding.statusText.text = "באוויר: ${o.optString("callSign")}" }
+            if (!fromSelf) {
+                RadioBus.audio.resetPlayback()
+                RadioTones.incoming(false)
             }
         })
         socket.on("ptt:end") {
             talking = false
             RadioBus.audio.stopCapture()
+            RadioTones.stopIncoming()
             RadioTones.end()
             runOnUiThread { binding.statusText.text = "מוכן לקשר" }
         }
         socket.on("ptt:audio", Emitter.Listener { args ->
-            val data = args.firstOrNull() as? ByteArray ?: return@Listener
-            RadioBus.audio.play(data)
+            val parsed = parseAudio(args) ?: return@Listener
+            val (pcm, ch) = parsed
+            if (!ch.isNullOrEmpty() && ch != selected) return@Listener
+            RadioTones.stopIncoming()
+            RadioBus.audio.play(pcm)
         })
         socket.on("direct:open", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
             val ch = o.optJSONObject("channel") ?: return@Listener
             val id = ch.optString("id")
             val name = ch.optString("name")
-            RadioTones.start()
+            val fromId = o.optJSONObject("from")?.optString("id")
+            if (fromId != session.userId) RadioTones.incoming(true)
             runOnUiThread {
                 selected = id
-                binding.statusText.text = "שיחה אישית: $name"
+                binding.statusText.text = if (fromId != session.userId) "שיחה נכנסת: $name" else "שיחה אישית: $name"
             }
             socket.emit("channel:join", JSONObject().put("channelId", id))
             socket.emit("channel:select", JSONObject().put("channelId", id))
@@ -180,7 +190,20 @@ class RadioActivity : AppCompatActivity(), LocationListener {
     }
 
     override fun onDestroy() {
+        RadioTones.stopIncoming()
         RadioBus.audio.release()
         super.onDestroy()
     }
+}
+
+private fun parseAudio(args: Array<out Any>): Pair<ByteArray, String?>? {
+    if (args.isEmpty()) return null
+    val a0 = args[0]
+    if (a0 is String && args.size > 1) {
+        val pcm = args[1] as? ByteArray ?: return null
+        return pcm to a0
+    }
+    val pcm = a0 as? ByteArray ?: return null
+    val ch = (args.getOrNull(1) as? JSONObject)?.optString("channelId")
+    return pcm to ch
 }

@@ -25,6 +25,10 @@ class Session(ctx: Context) {
         get() = prefs.getString("userId", "") ?: ""
         set(value) { prefs.edit().putString("userId", value).apply() }
 
+    var displayName: String
+        get() = prefs.getString("displayName", "") ?: ""
+        set(value) { prefs.edit().putString("displayName", value).apply() }
+
     fun clearAuth() {
         prefs.edit().remove("token").apply()
     }

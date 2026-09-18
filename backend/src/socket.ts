@@ -215,17 +215,25 @@ export function attachSockets(io: Server): void {
       });
     });
 
-    socket.on("ptt:audio", (data: unknown, meta?: { channelId?: string }) => {
-      const channelId = meta?.channelId ?? socket.data.selectedChannelId;
+    socket.on("ptt:audio", (a: unknown, b?: unknown) => {
+      let channelId: string | undefined;
+      let data: unknown;
+      if (typeof a === "string") {
+        channelId = a;
+        data = b;
+      } else {
+        data = a;
+        channelId =
+          b && typeof b === "object" && b !== null && "channelId" in b
+            ? String((b as { channelId?: string }).channelId)
+            : socket.data.selectedChannelId;
+      }
       if (!channelId) return;
       const floor = floors.get(channelId);
       if (!floor || floor.userId !== user.id) return;
       const buf = toBuffer(data);
-      if (!buf) return;
-      socket.to(room(channelId)).emit("ptt:audio", buf, {
-        channelId,
-        userId: user.id,
-      });
+      if (!buf || buf.length < 4) return;
+      socket.to(room(channelId)).emit("ptt:audio", channelId, buf);
     });
 
     socket.on("ptt:release", async (payload: { channelId?: string }) => {

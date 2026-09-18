@@ -5,11 +5,28 @@ import { api, type User } from "./api";
 import { COMPANY } from "./brand";
 import { useAuth } from "./store";
 import { isAdmin, isDispatcher, roleLabel } from "./roles";
+import { pttAudio } from "./audio";
 import { disconnectSocket } from "./socket";
+import { radioTones } from "./tones";
 
 export function AppShell() {
   const { token, user, setSession, logout, theme, toggleTheme } = useAuth();
   const nav = useNavigate();
+
+  useEffect(() => {
+    const unlock = () => {
+      radioTones.unlock();
+      void pttAudio.init();
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    window.addEventListener("touchstart", unlock, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) return;

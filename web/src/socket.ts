@@ -8,6 +8,7 @@ export function connectSocket(token: string): Socket {
   socket = io({
     auth: { token },
     transports: ["websocket", "polling"],
+    upgrade: true,
   });
   return socket;
 }
