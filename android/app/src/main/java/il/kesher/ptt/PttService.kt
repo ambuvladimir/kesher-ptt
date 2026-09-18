@@ -36,6 +36,7 @@ object RadioBus {
         val opts = IO.Options.builder()
             .setAuth(mapOf("token" to token))
             .setTransports(arrayOf("websocket", "polling"))
+            .setReconnection(true)
             .build()
         val s = IO.socket(URI.create(server), opts)
         socket = s

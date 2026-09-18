@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Map, Radio, Shield, Users } from "lucide-react";
+import { Map, Radio, Shield, Users, Settings } from "lucide-react";
 import { api, type Channel, type User } from "../api";
-import { COMPANY } from "../brand";
+import { useBranding } from "../branding";
 import { isAdmin, isDispatcher, isDriver, roleLabel } from "../roles";
 import { useAuth } from "../store";
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { name, product, logoUrl } = useBranding();
   const nav = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -30,10 +31,10 @@ export function DashboardPage() {
   return (
     <div>
       <div className="card dash-hero">
-        <img src={COMPANY.logo} alt={COMPANY.name} />
+        <img src={logoUrl} alt={name} />
         <div>
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>{COMPANY.product}</div>
-          <h2 style={{ margin: "4px 0" }}>{COMPANY.name}</h2>
+          <div style={{ color: "var(--muted)", fontSize: 13 }}>{product}</div>
+          <h2 style={{ margin: "4px 0" }}>{name}</h2>
           <p style={{ margin: 0, color: "var(--muted)" }}>
             שלום {user?.displayName} ({user?.callSign}) — {roleLabel(user?.role)}
           </p>
@@ -68,10 +69,10 @@ export function DashboardPage() {
           </button>
         )}
         {canAdmin && (
-          <button className="quick-card" onClick={() => nav("/admin")}>
-            <Shield size={22} color="var(--brand)" />
-            <b>ניהול מערכת</b>
-            <span style={{ color: "var(--muted)", fontSize: 13 }}>יחידות, הרשאות ויומן</span>
+          <button className="quick-card" onClick={() => nav("/settings")}>
+            <Settings size={22} color="var(--brand)" />
+            <b>הגדרות מערכת</b>
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>החלפת לוגו ושם המערכת</span>
           </button>
         )}
       </div>

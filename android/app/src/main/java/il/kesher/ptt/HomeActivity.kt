@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import il.kesher.ptt.databinding.ActivityHomeBinding
+import kotlin.concurrent.thread
 
 class HomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHomeBinding
@@ -22,6 +23,18 @@ class HomeActivity : AppCompatActivity() {
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.welcome.text = "${session.callSign} · ${session.displayName}"
+        thread {
+            try {
+                val b = Api.branding(session.serverUrl)
+                val bmp = Api.logoBitmap(session.serverUrl, b.optString("logoUrl"))
+                runOnUiThread {
+                    val n = b.optString("name")
+                    if (n.isNotBlank()) binding.companyName.text = n
+                    if (bmp != null) binding.logoView.setImageBitmap(bmp)
+                }
+            } catch (_: Exception) {
+            }
+        }
         binding.radioBtn.setOnClickListener {
             startActivity(Intent(this, RadioActivity::class.java))
         }

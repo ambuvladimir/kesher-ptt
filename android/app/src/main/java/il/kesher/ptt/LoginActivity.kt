@@ -21,6 +21,20 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
         binding.serverUrl.setText(session.serverUrl)
         requestPerms()
+        thread {
+            try {
+                val b = Api.branding(session.serverUrl)
+                val bmp = Api.logoBitmap(session.serverUrl, b.optString("logoUrl"))
+                runOnUiThread {
+                    val n = b.optString("name")
+                    val p = b.optString("product")
+                    if (n.isNotBlank()) binding.companyName.text = n
+                    if (p.isNotBlank()) binding.companyProduct.text = p
+                    if (bmp != null) binding.logoView.setImageBitmap(bmp)
+                }
+            } catch (_: Exception) {
+            }
+        }
 
         binding.loginBtn.setOnClickListener {
             val server = binding.serverUrl.text.toString().trim()

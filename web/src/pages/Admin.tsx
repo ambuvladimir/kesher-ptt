@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api, type Channel, type Unit, type User } from "../api";
+import { isAdmin } from "../roles";
+import { useAuth } from "../store";
 import { radioTones } from "../tones";
 
 type Tab = "users" | "channels" | "units" | "audit";
@@ -9,6 +12,7 @@ type UserForm = Partial<User> & {
 };
 
 export function AdminPage() {
+  const { user, token } = useAuth();
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<User[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -75,6 +79,9 @@ export function AdminPage() {
       setError((e as Error).message);
     }
   }
+
+  if (token && !user) return null;
+  if (!isAdmin(user?.role)) return <Navigate to="/dashboard" replace />;
 
   return (
     <div>

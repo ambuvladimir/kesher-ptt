@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { Radio, ShieldAlert } from "lucide-react";
 import { api, type Channel, type User } from "../api";
 import { pttAudio } from "../audio";
+import { parsePttAudio } from "../pcm";
 import { connectSocket } from "../socket";
 import { useAuth } from "../store";
 import { radioTones } from "../tones";
@@ -46,6 +47,7 @@ export function DispatchPage() {
     const socket = connectSocket(token);
     void pttAudio.init();
     radioTones.unlock();
+    pttAudio.resetPlayback();
 
     const onLoc = (loc: User & { userId?: string }) => {
       const id = loc.userId ?? loc.id;
@@ -59,15 +61,25 @@ export function DispatchPage() {
     const onStart = (p: { channelId: string; callSign: string; displayName: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker(`${p.callSign} · ${p.displayName}`);
-      if (p.userId !== user?.id) radioTones.start();
+      if (p.userId !== user?.id) {
+        pttAudio.beginReceive();
+        radioTones.incoming(false);
+      }
     };
     const onEnd = (p: { channelId: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker("");
       setTalking(false);
+      radioTones.stopIncoming();
       if (p.userId !== user?.id) radioTones.end();
     };
-    const onAudio = (data: ArrayBuffer) => pttAudio.playChunk(data);
+    const onAudio = (...args: unknown[]) => {
+      const parsed = parsePttAudio(args);
+      if (!parsed) return;
+      if (parsed.channelId && selected && parsed.channelId !== selected) return;
+      radioTones.stopIncomingLoop();
+      pttAudio.playChunk(parsed.pcm);
+    };
     const onMsg = (msg: { channelId: string } & (typeof messages)[0]) => {
       if (msg.channelId === selected) setMessages((m) => [...m.slice(-50), msg]);
     };
@@ -80,12 +92,16 @@ export function DispatchPage() {
       setAlert(p.reason || "הערוץ תפוס");
     };
     const onDirect = (p: { channel: { id: string; name: string }; from: { id: string; callSign: string } }) => {
-      radioTones.start();
       setChannels((prev) => (prev.some((c) => c.id === p.channel.id) ? prev : [...prev, p.channel as Channel]));
       setSelected(p.channel.id);
       socket.emit("channel:join", { channelId: p.channel.id });
       socket.emit("channel:select", { channelId: p.channel.id });
-      setAlert(`שיחה אישית: ${p.channel.name}`);
+      if (p.from.id !== user?.id) {
+        radioTones.incoming(true);
+        setAlert(`שיחה נכנסת: ${p.channel.name}`);
+      } else {
+        setAlert(`שיחה אישית: ${p.channel.name}`);
+      }
     };
 
     socket.on("location:broadcast", onLoc);
@@ -148,6 +164,12 @@ export function DispatchPage() {
     setTalking(false);
   }
 
+  function sendMsg() {
+    if (!text.trim() || !selected) return;
+    connectSocket(token!).emit("message:send", { channelId: selected, body: text.trim() });
+    setText("");
+  }
+
   return (
     <div>
       <div className="topbar">
@@ -164,7 +186,15 @@ export function DispatchPage() {
       {alert ? (
         <div className="alert-banner">
           <span><ShieldAlert size={16} style={{ verticalAlign: "middle" }} /> {alert}</span>
-          <button className="btn" onClick={() => setAlert(null)}>סגור</button>
+          <button
+            className="btn"
+            onClick={() => {
+              radioTones.stopIncoming();
+              setAlert(null);
+            }}
+          >
+            סגור
+          </button>
         </div>
       ) : null}
       {speaker ? <div className="talking-banner">באוויר: {speaker} · {current?.name}</div> : null}
@@ -254,12 +284,19 @@ export function DispatchPage() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="שידור טקסט לכוחות" />
-              <button className="btn gold" onClick={() => {
-                if (!text.trim() || !selected) return;
-                connectSocket(token!).emit("message:send", { channelId: selected, body: text.trim() });
-                setText("");
-              }}>שלח</button>
+              <input
+                className="input"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    sendMsg();
+                  }
+                }}
+                placeholder="שידור טקסט לכוחות"
+              />
+              <button className="btn gold" onClick={sendMsg}>שלח</button>
             </div>
           </div>
         </div>

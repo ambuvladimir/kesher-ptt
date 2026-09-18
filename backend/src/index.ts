@@ -51,6 +51,8 @@ async function main(): Promise<void> {
     maxHttpBufferSize: 2 * 1024 * 1024,
     pingTimeout: 25000,
     pingInterval: 20000,
+    perMessageDeflate: false,
+    httpCompression: false,
   });
   attachSockets(io);
 
