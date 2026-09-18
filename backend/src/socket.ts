@@ -88,10 +88,19 @@ export function attachSockets(io: Server): void {
       if (member?.canListen || privileged) socket.join(room(channelId));
     });
 
-    socket.on("direct:open", async (payload: { peerId?: string }) => {
-      if (!payload?.peerId) return;
+    socket.on("direct:open", async (payload: unknown) => {
+      const peerId =
+        typeof payload === "string"
+          ? payload
+          : payload && typeof payload === "object"
+            ? String((payload as { peerId?: string }).peerId ?? "")
+            : "";
+      if (!peerId) {
+        socket.emit("ptt:denied", { reason: "חסר יעד לשיחה אישית" });
+        return;
+      }
       try {
-        const { channel, from, peer } = await getOrCreateDirect(user.id, payload.peerId);
+        const { channel, from, peer } = await getOrCreateDirect(user.id, peerId);
         socket.join(room(channel.id));
         const packet = {
           channel,
