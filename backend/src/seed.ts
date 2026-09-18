@@ -3,19 +3,16 @@ import { hashPassword } from "./auth.js";
 
 export async function seedIfEmpty(): Promise<void> {
   const count = await prisma.user.count();
-  if (count > 0) return;
+  if (count > 0) {
+    await migrateRoles();
+    return;
+  }
 
   const mocad = await prisma.unit.create({
-    data: { name: "מוקד", code: "MOCAD", color: "#ef4444" },
+    data: { name: "מוקד", code: "MOCAD", color: "#c81e1e" },
   });
-  const siur = await prisma.unit.create({
-    data: { name: "סיור", code: "SIUR", color: "#3b82f6" },
-  });
-  const avtacha = await prisma.unit.create({
-    data: { name: "אבטחה", code: "AVTACHA", color: "#22c55e" },
-  });
-  const maintenance = await prisma.unit.create({
-    data: { name: "תחזוקה", code: "TECH", color: "#f59e0b" },
+  const drivers = await prisma.unit.create({
+    data: { name: "נהגים", code: "DRIVERS", color: "#2563eb" },
   });
 
   const dispatchCh = await prisma.channel.create({
@@ -23,36 +20,18 @@ export async function seedIfEmpty(): Promise<void> {
       name: "מוקד ראשי",
       code: "DISP-1",
       kind: "dispatch",
-      description: "ערוץ דיספאצר ראשי",
-      color: "#ef4444",
+      description: "שיחה קבוצתית — מוקד דיספאצר",
+      color: "#c81e1e",
       maxTalkSec: 60,
     },
   });
-  const patrolCh = await prisma.channel.create({
+  const driverCh = await prisma.channel.create({
     data: {
-      name: "סיור 1",
-      code: "TG-SIUR-1",
+      name: "נהגים",
+      code: "TG-DRIVERS",
       kind: "talkgroup",
-      description: "קבוצת דיבור לסיור",
-      color: "#3b82f6",
-    },
-  });
-  const guardCh = await prisma.channel.create({
-    data: {
-      name: "אבטחה",
-      code: "TG-SEC",
-      kind: "talkgroup",
-      description: "אבטחה היקפית",
-      color: "#22c55e",
-    },
-  });
-  const techCh = await prisma.channel.create({
-    data: {
-      name: "תחזוקה",
-      code: "TG-TECH",
-      kind: "talkgroup",
-      description: "צוות טכני",
-      color: "#f59e0b",
+      description: "שיחה קבוצתית לכל הנהגים",
+      color: "#2563eb",
     },
   });
   const emergencyCh = await prisma.channel.create({
@@ -60,7 +39,7 @@ export async function seedIfEmpty(): Promise<void> {
       name: "חירום",
       code: "EMRG",
       kind: "emergency",
-      description: "ערוץ חירום ארגוני — כולם מאזינים",
+      description: "ערוץ חירום — כולם מאזינים",
       color: "#fb7185",
       maxTalkSec: 90,
     },
@@ -115,67 +94,56 @@ export async function seedIfEmpty(): Promise<void> {
   const dispatcher = await mkUser({
     username: "dispatcher",
     password: "KesherDisp!23",
-    displayName: "מוקדן ראשי",
+    displayName: "דיספאצר ראשי",
     callSign: "מוקד-1",
     role: "dispatcher",
     unitId: mocad.id,
     lat: lat + 0.002,
     lng: lng - 0.001,
   });
-  const supervisor = await mkUser({
-    username: "supervisor",
-    password: "KesherSup!23",
-    displayName: "אחמ״ש סיור",
-    callSign: "סיור-פיקוד",
-    role: "supervisor",
-    unitId: siur.id,
-    lat: lat - 0.004,
-    lng: lng + 0.003,
+  const dispatcher2 = await mkUser({
+    username: "dispatcher2",
+    password: "KesherDisp!23",
+    displayName: "דיספאצר משמרת",
+    callSign: "מוקד-2",
+    role: "dispatcher",
+    unitId: mocad.id,
+    lat: lat + 0.003,
+    lng: lng + 0.001,
   });
-  const field1 = await mkUser({
-    username: "siur1",
+  const driver1 = await mkUser({
+    username: "driver1",
     password: "KesherField!23",
-    displayName: "ניידת 12",
+    displayName: "נהג אמבולנס 12",
     callSign: "12",
-    role: "field",
-    unitId: siur.id,
+    role: "driver",
+    unitId: drivers.id,
     lat: lat + 0.01,
     lng: lng + 0.008,
   });
-  const field2 = await mkUser({
-    username: "siur2",
+  const driver2 = await mkUser({
+    username: "driver2",
     password: "KesherField!23",
-    displayName: "ניידת 14",
+    displayName: "נהג אמבולנס 14",
     callSign: "14",
-    role: "field",
-    unitId: siur.id,
+    role: "driver",
+    unitId: drivers.id,
     lat: lat - 0.008,
     lng: lng + 0.012,
   });
-  const guard1 = await mkUser({
-    username: "sec1",
+  const driver3 = await mkUser({
+    username: "driver3",
     password: "KesherField!23",
-    displayName: "מאבטח שער",
-    callSign: "שער-1",
-    role: "field",
-    unitId: avtacha.id,
-    lat: lat + 0.003,
+    displayName: "נהג אמבולנס 16",
+    callSign: "16",
+    role: "driver",
+    unitId: drivers.id,
+    lat: lat + 0.006,
     lng: lng - 0.01,
   });
-  const tech1 = await mkUser({
-    username: "tech1",
-    password: "KesherField!23",
-    displayName: "טכנאי תורן",
-    callSign: "טכני-1",
-    role: "field",
-    unitId: maintenance.id,
-    lat: lat - 0.012,
-    lng: lng - 0.006,
-  });
 
-  const allUsers = [admin, dispatcher, supervisor, field1, field2, guard1, tech1];
+  const allUsers = [admin, dispatcher, dispatcher2, driver1, driver2, driver3];
   const memberships: { userId: string; channelId: string; canTalk: boolean; isPrimary: boolean }[] = [];
-
   const add = (userId: string, channelId: string, canTalk = true, isPrimary = false) => {
     memberships.push({ userId, channelId, canTalk, isPrimary });
   };
@@ -183,22 +151,16 @@ export async function seedIfEmpty(): Promise<void> {
   for (const u of allUsers) {
     add(u.id, emergencyCh.id, true, false);
     add(u.id, allCall.id, u.role === "admin" || u.role === "dispatcher", false);
-    add(u.id, dispatchCh.id, u.role !== "field", u.role === "dispatcher");
+    add(u.id, dispatchCh.id, u.role !== "driver", u.role === "dispatcher");
+    add(u.id, driverCh.id, true, u.role === "driver");
   }
-  add(supervisor.id, patrolCh.id, true, true);
-  add(field1.id, patrolCh.id, true, true);
-  add(field2.id, patrolCh.id, true, true);
-  add(guard1.id, guardCh.id, true, true);
-  add(tech1.id, techCh.id, true, true);
-  add(admin.id, patrolCh.id, true);
-  add(admin.id, guardCh.id, true);
-  add(admin.id, techCh.id, true);
-  add(dispatcher.id, patrolCh.id, true);
-  add(dispatcher.id, guardCh.id, true);
-  add(dispatcher.id, techCh.id, true);
 
   await prisma.channelMember.createMany({ data: memberships });
   await prisma.auditLog.create({
-    data: { userId: admin.id, action: "seed", detail: "אתחול נתוני דמו" },
+    data: { userId: admin.id, action: "seed", detail: "אתחול יוסי אמבולנס: מנהלים, דיספאצרים ונהגים" },
   });
+}
+
+async function migrateRoles(): Promise<void> {
+  await prisma.user.updateMany({ where: { role: "field" }, data: { role: "driver" } });
 }

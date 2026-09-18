@@ -2,22 +2,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Channel, type User } from "../api";
 import { pttAudio } from "../audio";
+import { COMPANY } from "../brand";
+import { isGroupKind, roleLabel } from "../roles";
 import { connectSocket } from "../socket";
 import { useAuth } from "../store";
+import { radioTones } from "../tones";
+
+type CallMode = "group" | "direct";
 
 export function RadioPage() {
-  const { token, user, logout } = useAuth();
+  const { token, user } = useAuth();
   const nav = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [people, setPeople] = useState<User[]>([]);
   const [selected, setSelected] = useState<string>("");
-  const [status, setStatus] = useState("מוכן");
+  const [mode, setMode] = useState<CallMode>("group");
+  const [status, setStatus] = useState("מוכן לקשר");
   const [talking, setTalking] = useState(false);
   const [speaker, setSpeaker] = useState("");
+  const [incoming, setIncoming] = useState<string | null>(null);
   const [messages, setMessages] = useState<{ id: string; body: string; user?: { callSign: string } }[]>([]);
   const [text, setText] = useState("");
   const hold = useRef(false);
 
   const current = useMemo(() => channels.find((c) => c.id === selected), [channels, selected]);
+  const groups = useMemo(() => channels.filter((c) => isGroupKind(c.kind)), [channels]);
+  const contacts = useMemo(() => people.filter((p) => p.id !== user?.id && p.isActive), [people, user?.id]);
 
   useEffect(() => {
     if (!token) {
@@ -25,9 +35,15 @@ export function RadioPage() {
       return;
     }
     void (async () => {
-      const list = await api<Channel[]>("/api/channels");
+      const [list, roster] = await Promise.all([
+        api<Channel[]>("/api/channels"),
+        api<User[]>("/api/users").catch(() => [] as User[]),
+      ]);
       setChannels(list);
-      const primary = user?.memberships?.find((m) => m.isPrimary)?.channelId ?? list[0]?.id;
+      setPeople(roster);
+      const primary =
+        user?.memberships?.find((m) => m.isPrimary && isGroupKind(m.kind))?.channelId ??
+        list.find((c) => isGroupKind(c.kind))?.id;
       if (primary) setSelected(primary);
     })();
   }, [token, user, nav]);
@@ -36,34 +52,56 @@ export function RadioPage() {
     if (!token) return;
     const socket = connectSocket(token);
     void pttAudio.init();
+    radioTones.unlock();
     socket.emit("channel:select", { channelId: selected });
 
-    const onStart = (p: { channelId: string; callSign: string; displayName: string }) => {
+    const onStart = (p: { channelId: string; callSign: string; displayName: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker(`${p.callSign} · ${p.displayName}`);
       setStatus("משדר");
+      if (p.userId !== user?.id) radioTones.start();
     };
-    const onEnd = (p: { channelId: string }) => {
+    const onEnd = (p: { channelId: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker("");
-      setStatus("מוכן");
+      setStatus("מוכן לקשר");
       setTalking(false);
+      if (p.userId !== user?.id) radioTones.end();
     };
     const onGranted = () => {
+      radioTones.start();
       setTalking(true);
       setStatus("אתה משדר");
     };
     const onDenied = (p: { reason: string; holder?: string }) => {
+      radioTones.error();
       setTalking(false);
       setStatus(p.holder ? `${p.reason} (${p.holder})` : p.reason);
     };
     const onAudio = (data: ArrayBuffer) => pttAudio.playChunk(data);
     const onMsg = (msg: { channelId: string; id: string; body: string; user?: { callSign: string } }) => {
-      if (msg.channelId && selected && (msg as { channelId?: string }).channelId !== selected) return;
+      if (msg.channelId && selected && msg.channelId !== selected) return;
       setMessages((m) => [...m.slice(-40), msg]);
     };
     const onEmergency = (a: { callSign: string; note: string }) => {
+      radioTones.emergency();
       setStatus(`חירום: ${a.callSign} — ${a.note}`);
+    };
+    const onDirect = (p: {
+      channel: Channel;
+      from: { id: string; callSign: string; displayName: string };
+    }) => {
+      setChannels((prev) => (prev.some((c) => c.id === p.channel.id) ? prev : [...prev, p.channel]));
+      socket.emit("channel:join", { channelId: p.channel.id });
+      setMode("direct");
+      setSelected(p.channel.id);
+      socket.emit("channel:select", { channelId: p.channel.id });
+      if (p.from.id !== user?.id) {
+        radioTones.start();
+        setIncoming(`שיחה אישית מ-${p.from.callSign} ${p.from.displayName}`);
+      } else {
+        setStatus("שיחה אישית פתוחה");
+      }
     };
 
     socket.on("ptt:start", onStart);
@@ -73,6 +111,7 @@ export function RadioPage() {
     socket.on("ptt:audio", onAudio);
     socket.on("message:new", onMsg);
     socket.on("emergency:alert", onEmergency);
+    socket.on("direct:open", onDirect);
 
     let watch = 0;
     if (navigator.geolocation) {
@@ -99,9 +138,10 @@ export function RadioPage() {
       socket.off("ptt:audio", onAudio);
       socket.off("message:new", onMsg);
       socket.off("emergency:alert", onEmergency);
+      socket.off("direct:open", onDirect);
       if (watch) navigator.geolocation.clearWatch(watch);
     };
-  }, [token, selected]);
+  }, [token, selected, user?.id]);
 
   useEffect(() => {
     if (!selected || !token) return;
@@ -109,11 +149,17 @@ export function RadioPage() {
     connectSocket(token).emit("channel:select", { channelId: selected });
   }, [selected, token]);
 
+  function openDirect(peerId: string) {
+    if (!token) return;
+    connectSocket(token).emit("direct:open", { peerId });
+  }
+
   async function press() {
     if (!selected || talking) return;
     hold.current = true;
     const socket = connectSocket(token!);
     await pttAudio.init();
+    radioTones.unlock();
     socket.emit("ptt:request", { channelId: selected });
     socket.once("ptt:granted", async () => {
       if (!hold.current) {
@@ -123,15 +169,18 @@ export function RadioPage() {
       try {
         await pttAudio.startTalk(socket, selected);
       } catch {
+        radioTones.error();
         setStatus("אין גישה למיקרופון — נדרש HTTPS או אפליקציית אנדרואיד");
       }
     });
   }
 
   function release() {
+    const was = hold.current || talking;
     hold.current = false;
     pttAudio.stopTalk();
     if (selected) connectSocket(token!).emit("ptt:release", { channelId: selected });
+    if (was) radioTones.end();
     setTalking(false);
   }
 
@@ -142,7 +191,8 @@ export function RadioPage() {
   }
 
   function emergency() {
-    if (!confirm("לשלוח קריאת חירום למוקד?")) return;
+    if (!confirm("לשלוח קריאת חירום למוקד יוסי אמבולנס?")) return;
+    radioTones.emergency();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         connectSocket(token!).emit("emergency", {
@@ -158,19 +208,49 @@ export function RadioPage() {
   return (
     <div className="ptt-wrap">
       <div className="ptt-head">
-        <div>
-          <b>{user?.callSign}</b>
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>{user?.displayName}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <img src={COMPANY.logo} alt="" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+          <div>
+            <b>{user?.callSign}</b>
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>
+              {COMPANY.name} · {roleLabel(user?.role)} · {user?.displayName}
+            </div>
+          </div>
         </div>
-        <button className="btn ghost" onClick={() => { logout(); nav("/login"); }}>יציאה</button>
+        {speaker ? <span className="badge"><span className="dot talk" /> באוויר: {speaker}</span> : null}
       </div>
-      <div className="channels">
-        {channels.map((c) => (
-          <button key={c.id} className={`ch-pill ${c.id === selected ? "active" : ""}`} onClick={() => setSelected(c.id)}>
-            {c.name}
-          </button>
-        ))}
+      {incoming ? (
+        <div className="alert-banner" style={{ margin: "10px 16px 0" }}>
+          <span>{incoming}</span>
+          <button className="btn" onClick={() => setIncoming(null)}>אישור</button>
+        </div>
+      ) : null}
+      <div className="toolbar" style={{ padding: "12px 16px 0" }}>
+        <button className={`btn ${mode === "group" ? "primary" : "ghost"}`} onClick={() => setMode("group")}>שיחה קבוצתית</button>
+        <button className={`btn ${mode === "direct" ? "primary" : "ghost"}`} onClick={() => setMode("direct")}>שיחה אישית</button>
       </div>
+      {mode === "group" ? (
+        <div className="channels">
+          {groups.map((c) => (
+            <button key={c.id} className={`ch-pill ${c.id === selected ? "active" : ""}`} onClick={() => setSelected(c.id)}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="channels">
+          {contacts.map((p) => (
+            <button
+              key={p.id}
+              className={`ch-pill ${current?.kind === "direct" && current.name.includes(p.callSign) ? "active" : ""}`}
+              onClick={() => openDirect(p.id)}
+            >
+              <span className={`dot ${p.status === "offline" ? "" : "on"}`} /> {p.callSign} · {p.displayName}
+              <span style={{ color: "var(--muted)", marginRight: 6 }}>{roleLabel(p.role)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="ptt-body">
         <div>
           <button
@@ -184,7 +264,7 @@ export function RadioPage() {
             PTT
           </button>
           <div className="ptt-meta">
-            <div>{current ? `${current.name} · ${current.code}` : "אין ערוץ"}</div>
+            <div>{current ? `${current.kind === "direct" ? "אישי" : "קבוצתי"} · ${current.name}` : "אין ערוץ"}</div>
             <div>{speaker ? `באוויר: ${speaker}` : status}</div>
           </div>
         </div>
@@ -198,7 +278,7 @@ export function RadioPage() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="הודעת טקסט לערוץ" />
+          <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="הודעת טקסט" />
           <button className="btn" onClick={sendMsg}>שלח</button>
         </div>
       </div>

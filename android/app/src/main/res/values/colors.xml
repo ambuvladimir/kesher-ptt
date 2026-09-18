@@ -1,8 +1,9 @@
 <resources>
-    <color name="bg">#070B14</color>
-    <color name="panel">#121B2E</color>
-    <color name="amber">#F59E0B</color>
-    <color name="text">#E8EEFC</color>
-    <color name="muted">#93A0BB</color>
-    <color name="red">#7F1D1D</color>
+    <color name="bg">#F3F5F9</color>
+    <color name="panel">#FFFFFF</color>
+    <color name="brand">#C81E1E</color>
+    <color name="amber">#C9A227</color>
+    <color name="text">#152033</color>
+    <color name="muted">#5B6B82</color>
+    <color name="red">#C81E1E</color>
 </resources>

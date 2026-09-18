@@ -11,20 +11,33 @@
         android:gravity="center_vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+        <ImageView
+            android:src="@drawable/logo"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@string/app_name" />
         <TextView
             android:id="@+id/callSign"
             android:textStyle="bold"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textColor="@color/text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1" />
         <Button
-            android:id="@+id/logoutBtn"
-            android:text="יציאה"
+            android:id="@+id/homeBtn"
+            android:text="ראשי"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
     </LinearLayout>
+
+    <TextView
+        android:text="שיחה קבוצתית"
+        android:textColor="@color/muted"
+        android:paddingStart="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 
     <HorizontalScrollView
         android:layout_width="match_parent"
@@ -38,8 +51,26 @@
     </HorizontalScrollView>
 
     <TextView
+        android:text="שיחה אישית"
+        android:textColor="@color/muted"
+        android:paddingStart="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <LinearLayout
+            android:id="@+id/contactRow"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </HorizontalScrollView>
+
+    <TextView
         android:id="@+id/statusText"
-        android:text="מוכן"
+        android:text="מוכן לקשר"
         android:textColor="@color/muted"
         android:gravity="center"
         android:layout_width="match_parent"
@@ -54,7 +85,7 @@
             android:text="PTT"
             android:textSize="28sp"
             android:textStyle="bold"
-            android:backgroundTint="@color/amber"
+            android:backgroundTint="@color/brand"
             android:layout_gravity="center"
             android:layout_width="220dp"
             android:layout_height="220dp" />
@@ -63,7 +94,7 @@
     <Button
         android:id="@+id/emergencyBtn"
         android:text="חירום"
-        android:backgroundTint="@color/red"
+        android:backgroundTint="@color/brand"
         android:layout_margin="16dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />

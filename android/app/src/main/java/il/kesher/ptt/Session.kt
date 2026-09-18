@@ -6,8 +6,12 @@ class Session(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("kesher", Context.MODE_PRIVATE)
 
     var serverUrl: String
-        get() = prefs.getString("server", "http://192.168.1.10:8080") ?: ""
+        get() = prefs.getString("server", "http://10.0.2.2:8080") ?: ""
         set(value) { prefs.edit().putString("server", value.trimEnd('/')).apply() }
+
+    var dark: Boolean
+        get() = prefs.getBoolean("dark", false)
+        set(value) { prefs.edit().putBoolean("dark", value).apply() }
 
     var token: String?
         get() = prefs.getString("token", null)
@@ -17,9 +21,9 @@ class Session(ctx: Context) {
         get() = prefs.getString("callSign", "") ?: ""
         set(value) { prefs.edit().putString("callSign", value).apply() }
 
-    var displayName: String
-        get() = prefs.getString("displayName", "") ?: ""
-        set(value) { prefs.edit().putString("displayName", value).apply() }
+    var userId: String
+        get() = prefs.getString("userId", "") ?: ""
+        set(value) { prefs.edit().putString("userId", value).apply() }
 
     fun clearAuth() {
         prefs.edit().remove("token").apply()

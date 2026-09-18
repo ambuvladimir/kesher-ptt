@@ -37,11 +37,15 @@ class LoginActivity : AppCompatActivity() {
                         session.token = token
                         session.callSign = profile.optString("callSign")
                         session.displayName = profile.optString("displayName")
-                        startActivity(Intent(this, RadioActivity::class.java))
+                        session.userId = profile.optString("id")
+                        startActivity(Intent(this, HomeActivity::class.java))
                         finish()
                     }
                 } catch (e: Exception) {
-                    runOnUiThread { binding.errorText.text = e.message }
+                    runOnUiThread {
+                        RadioTones.error()
+                        binding.errorText.text = e.message
+                    }
                 }
             }
         }

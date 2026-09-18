@@ -1,12 +1,14 @@
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { LogOut, Radio, Shield, Map } from "lucide-react";
+import { Home, LogOut, Radio, Shield, Map, Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
 import { api, type User } from "./api";
+import { COMPANY } from "./brand";
 import { useAuth } from "./store";
+import { isAdmin, isDispatcher, roleLabel } from "./roles";
 import { disconnectSocket } from "./socket";
 
 export function AppShell() {
-  const { token, user, setSession, logout } = useAuth();
+  const { token, user, setSession, logout, theme, toggleTheme } = useAuth();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -20,19 +22,24 @@ export function AppShell() {
   }, [token, setSession, logout, nav]);
 
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role === "field") return <Navigate to="/radio" replace />;
+
+  const canDispatch = isDispatcher(user?.role);
+  const canAdmin = isAdmin(user?.role);
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">ק</div>
+        <button className="brand" onClick={() => nav("/dashboard")} style={{ border: 0, background: "transparent", cursor: "pointer", width: "100%" }}>
+          <img className="brand-logo" src={COMPANY.logo} alt={COMPANY.name} />
           <div>
-            <h1>קשר</h1>
-            <p>{user?.callSign ?? "טוען..."}</p>
+            <h1>{COMPANY.name}</h1>
+            <p>{COMPANY.product} · {roleLabel(user?.role)} · {user?.callSign ?? "…"}</p>
           </div>
-        </div>
-        {(user?.role === "admin" || user?.role === "dispatcher" || user?.role === "supervisor") && (
+        </button>
+        <NavLink to="/dashboard" className={({ isActive }) => `nav-btn ${isActive ? "home-active" : ""}`}>
+          <Home size={18} /> מסך ראשי
+        </NavLink>
+        {canDispatch && (
           <NavLink to="/dispatch" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
             <Map size={18} /> מוקד דיספאצר
           </NavLink>
@@ -40,12 +47,16 @@ export function AppShell() {
         <NavLink to="/radio" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
           <Radio size={18} /> מכשיר קשר
         </NavLink>
-        {user?.role === "admin" && (
+        {canAdmin && (
           <NavLink to="/admin" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
             <Shield size={18} /> ניהול
           </NavLink>
         )}
         <div style={{ flex: 1 }} />
+        <button className="nav-btn" onClick={toggleTheme}>
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          {theme === "dark" ? "עיצוב בהיר" : "עיצוב כהה"}
+        </button>
         <button
           className="nav-btn"
           onClick={() => {
@@ -57,16 +68,25 @@ export function AppShell() {
           <LogOut size={18} /> יציאה
         </button>
       </aside>
-      <main className="main">
-        <Outlet />
-      </main>
+      <div className="content-col">
+        <header className="app-top">
+          <button className="btn icon ghost" onClick={() => nav("/dashboard")}>
+            <Home size={16} /> דאשבורד
+          </button>
+          <div style={{ color: "var(--muted)", fontSize: 13 }}>
+            {roleLabel(user?.role)} · {user?.displayName} · {user?.callSign}
+          </div>
+        </header>
+        <main className="main">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
 
 export function HomeRedirect() {
-  const { user, homeFor, token } = useAuth();
+  const { token } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (!user) return <div className="login-wrap">טוען...</div>;
-  return <Navigate to={homeFor(user.role)} replace />;
+  return <Navigate to="/dashboard" replace />;
 }

@@ -22,6 +22,7 @@ class RadioActivity : AppCompatActivity(), LocationListener {
     private lateinit var binding: ActivityRadioBinding
     private lateinit var session: Session
     private var channels: List<Channel> = emptyList()
+    private var contacts: List<Contact> = emptyList()
     private var selected: String = ""
     private var talking = false
 
@@ -42,8 +43,12 @@ class RadioActivity : AppCompatActivity(), LocationListener {
 
         thread {
             try {
-                channels = Api.channels(session.serverUrl, token)
-                runOnUiThread { renderChannels() }
+                channels = Api.channels(session.serverUrl, token).filter { it.kind != "direct" }
+                contacts = Api.users(session.serverUrl, token).filter { it.id != session.userId }
+                runOnUiThread {
+                    renderChannels()
+                    renderContacts()
+                }
             } catch (e: Exception) {
                 runOnUiThread { Toast.makeText(this, e.message, Toast.LENGTH_LONG).show() }
             }
@@ -59,25 +64,42 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         }
         socket.on("ptt:denied", Emitter.Listener { args ->
             val reason = (args.firstOrNull() as? JSONObject)?.optString("reason") ?: "נדחה"
+            RadioTones.error()
             runOnUiThread { binding.statusText.text = reason }
         })
         socket.on("ptt:start", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
             if (o.optString("channelId") == selected) {
+                RadioTones.start()
                 runOnUiThread { binding.statusText.text = "באוויר: ${o.optString("callSign")}" }
             }
         })
         socket.on("ptt:end") {
             talking = false
             RadioBus.audio.stopCapture()
-            runOnUiThread { binding.statusText.text = "מוכן" }
+            RadioTones.end()
+            runOnUiThread { binding.statusText.text = "מוכן לקשר" }
         }
         socket.on("ptt:audio", Emitter.Listener { args ->
             val data = args.firstOrNull() as? ByteArray ?: return@Listener
             RadioBus.audio.play(data)
         })
+        socket.on("direct:open", Emitter.Listener { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@Listener
+            val ch = o.optJSONObject("channel") ?: return@Listener
+            val id = ch.optString("id")
+            val name = ch.optString("name")
+            RadioTones.start()
+            runOnUiThread {
+                selected = id
+                binding.statusText.text = "שיחה אישית: $name"
+            }
+            socket.emit("channel:join", JSONObject().put("channelId", id))
+            socket.emit("channel:select", JSONObject().put("channelId", id))
+        })
         socket.on("emergency:alert", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
+            RadioTones.emergency()
             runOnUiThread { binding.statusText.text = "חירום: ${o.optString("callSign")}" }
         })
 
@@ -98,12 +120,11 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         }
 
         binding.emergencyBtn.setOnClickListener {
+            RadioTones.emergency()
             socket.emit("emergency", JSONObject().put("note", "קריאת חירום מהשטח"))
         }
-        binding.logoutBtn.setOnClickListener {
-            session.clearAuth()
-            RadioBus.socket?.disconnect()
-            startActivity(Intent(this, LoginActivity::class.java))
+        binding.homeBtn.setOnClickListener {
+            startActivity(Intent(this, HomeActivity::class.java))
             finish()
         }
 
@@ -122,9 +143,22 @@ class RadioActivity : AppCompatActivity(), LocationListener {
             }
             binding.channelRow.addView(b)
         }
-        channels.firstOrNull()?.let {
+        channels.firstOrNull { it.kind != "direct" }?.let {
             selected = it.id
             RadioBus.socket?.emit("channel:select", JSONObject().put("channelId", selected))
+        }
+    }
+
+    private fun renderContacts() {
+        binding.contactRow.removeAllViews()
+        contacts.forEach { person ->
+            val b = Button(this)
+            b.text = "${person.callSign} ${person.name}"
+            b.setOnClickListener {
+                RadioBus.socket?.emit("direct:open", JSONObject().put("peerId", person.id))
+                binding.statusText.text = "שיחה אישית עם ${person.callSign}"
+            }
+            binding.contactRow.addView(b)
         }
     }
 

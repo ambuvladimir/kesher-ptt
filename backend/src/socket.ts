@@ -2,6 +2,7 @@ import type { Server } from "socket.io";
 import { prisma } from "./config.js";
 import { verifyToken, type AuthUser } from "./auth.js";
 import { audit } from "./util.js";
+import { getOrCreateDirect } from "./direct.js";
 
 type Floor = {
   userId: string;
@@ -77,6 +78,33 @@ export function attachSockets(io: Server): void {
       socket.data.selectedChannelId = payload?.channelId;
     });
 
+    socket.on("channel:join", async (payload: { channelId?: string }) => {
+      const channelId = payload?.channelId;
+      if (!channelId) return;
+      const member = await prisma.channelMember.findUnique({
+        where: { userId_channelId: { userId: user.id, channelId } },
+      });
+      const privileged = user.role === "admin" || user.role === "dispatcher" || user.role === "supervisor";
+      if (member?.canListen || privileged) socket.join(room(channelId));
+    });
+
+    socket.on("direct:open", async (payload: { peerId?: string }) => {
+      if (!payload?.peerId) return;
+      try {
+        const { channel, from, peer } = await getOrCreateDirect(user.id, payload.peerId);
+        socket.join(room(channel.id));
+        const packet = {
+          channel,
+          from: { id: from.id, callSign: from.callSign, displayName: from.displayName, role: from.role },
+          peer: { id: peer.id, callSign: peer.callSign, displayName: peer.displayName, role: peer.role },
+        };
+        socket.emit("direct:open", packet);
+        io.to(`user:${peer.id}`).emit("direct:open", packet);
+      } catch (err) {
+        socket.emit("ptt:denied", { reason: (err as Error).message });
+      }
+    });
+
     socket.on("location:update", async (payload: {
       lat?: number;
       lng?: number;
@@ -137,7 +165,7 @@ export function attachSockets(io: Server): void {
       const member = await prisma.channelMember.findUnique({
         where: { userId_channelId: { userId: user.id, channelId } },
       });
-      const privileged = user.role === "admin" || user.role === "dispatcher";
+      const privileged = user.role === "admin" || user.role === "dispatcher" || user.role === "supervisor";
       const canTalk =
         privileged ||
         member?.canTalk ||
