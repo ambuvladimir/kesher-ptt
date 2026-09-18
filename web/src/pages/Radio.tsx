@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Channel, type User } from "../api";
+import { api, type Channel } from "../api";
 import { pttAudio } from "../audio";
+import { COMPANY } from "../brand";
 import { connectSocket } from "../socket";
 import { useAuth } from "../store";
+import { radioTones } from "../tones";
 
 export function RadioPage() {
-  const { token, user, logout } = useAuth();
+  const { token, user } = useAuth();
   const nav = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selected, setSelected] = useState<string>("");
-  const [status, setStatus] = useState("מוכן");
+  const [status, setStatus] = useState("מוכן לקשר");
   const [talking, setTalking] = useState(false);
   const [speaker, setSpeaker] = useState("");
   const [messages, setMessages] = useState<{ id: string; body: string; user?: { callSign: string } }[]>([]);
@@ -36,33 +38,39 @@ export function RadioPage() {
     if (!token) return;
     const socket = connectSocket(token);
     void pttAudio.init();
+    radioTones.unlock();
     socket.emit("channel:select", { channelId: selected });
 
-    const onStart = (p: { channelId: string; callSign: string; displayName: string }) => {
+    const onStart = (p: { channelId: string; callSign: string; displayName: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker(`${p.callSign} · ${p.displayName}`);
       setStatus("משדר");
+      if (p.userId !== user?.id) radioTones.start();
     };
-    const onEnd = (p: { channelId: string }) => {
+    const onEnd = (p: { channelId: string; userId?: string }) => {
       if (p.channelId !== selected) return;
       setSpeaker("");
-      setStatus("מוכן");
+      setStatus("מוכן לקשר");
       setTalking(false);
+      if (p.userId !== user?.id) radioTones.end();
     };
     const onGranted = () => {
+      radioTones.start();
       setTalking(true);
       setStatus("אתה משדר");
     };
     const onDenied = (p: { reason: string; holder?: string }) => {
+      radioTones.error();
       setTalking(false);
       setStatus(p.holder ? `${p.reason} (${p.holder})` : p.reason);
     };
     const onAudio = (data: ArrayBuffer) => pttAudio.playChunk(data);
     const onMsg = (msg: { channelId: string; id: string; body: string; user?: { callSign: string } }) => {
-      if (msg.channelId && selected && (msg as { channelId?: string }).channelId !== selected) return;
+      if (msg.channelId && selected && msg.channelId !== selected) return;
       setMessages((m) => [...m.slice(-40), msg]);
     };
     const onEmergency = (a: { callSign: string; note: string }) => {
+      radioTones.emergency();
       setStatus(`חירום: ${a.callSign} — ${a.note}`);
     };
 
@@ -101,7 +109,7 @@ export function RadioPage() {
       socket.off("emergency:alert", onEmergency);
       if (watch) navigator.geolocation.clearWatch(watch);
     };
-  }, [token, selected]);
+  }, [token, selected, user?.id]);
 
   useEffect(() => {
     if (!selected || !token) return;
@@ -114,6 +122,7 @@ export function RadioPage() {
     hold.current = true;
     const socket = connectSocket(token!);
     await pttAudio.init();
+    radioTones.unlock();
     socket.emit("ptt:request", { channelId: selected });
     socket.once("ptt:granted", async () => {
       if (!hold.current) {
@@ -123,15 +132,18 @@ export function RadioPage() {
       try {
         await pttAudio.startTalk(socket, selected);
       } catch {
+        radioTones.error();
         setStatus("אין גישה למיקרופון — נדרש HTTPS או אפליקציית אנדרואיד");
       }
     });
   }
 
   function release() {
+    const was = hold.current || talking;
     hold.current = false;
     pttAudio.stopTalk();
     if (selected) connectSocket(token!).emit("ptt:release", { channelId: selected });
+    if (was) radioTones.end();
     setTalking(false);
   }
 
@@ -142,7 +154,8 @@ export function RadioPage() {
   }
 
   function emergency() {
-    if (!confirm("לשלוח קריאת חירום למוקד?")) return;
+    if (!confirm("לשלוח קריאת חירום למוקד יוסי אמבולנס?")) return;
+    radioTones.emergency();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         connectSocket(token!).emit("emergency", {
@@ -158,11 +171,14 @@ export function RadioPage() {
   return (
     <div className="ptt-wrap">
       <div className="ptt-head">
-        <div>
-          <b>{user?.callSign}</b>
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>{user?.displayName}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <img src={COMPANY.logo} alt="" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+          <div>
+            <b>{user?.callSign}</b>
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>{COMPANY.name} · {user?.displayName}</div>
+          </div>
         </div>
-        <button className="btn ghost" onClick={() => { logout(); nav("/login"); }}>יציאה</button>
+        {speaker ? <span className="badge"><span className="dot talk" /> באוויר: {speaker}</span> : null}
       </div>
       <div className="channels">
         {channels.map((c) => (

@@ -7,6 +7,7 @@ import { api, type Channel, type User } from "../api";
 import { pttAudio } from "../audio";
 import { connectSocket } from "../socket";
 import { useAuth } from "../store";
+import { radioTones } from "../tones";
 
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: string })._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -25,6 +26,7 @@ export function DispatchPage() {
   const [speaker, setSpeaker] = useState("");
   const [talking, setTalking] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
+  const [rosterQ, setRosterQ] = useState("");
   const [messages, setMessages] = useState<{ id: string; body: string; kind?: string; user?: { callSign: string; displayName: string } }[]>([]);
   const [text, setText] = useState("");
 
@@ -42,6 +44,7 @@ export function DispatchPage() {
     if (!token) return;
     const socket = connectSocket(token);
     void pttAudio.init();
+    radioTones.unlock();
 
     const onLoc = (loc: User & { userId?: string }) => {
       const id = loc.userId ?? loc.id;
@@ -52,21 +55,28 @@ export function DispatchPage() {
     const onPresence = (p: { userId: string; status: string }) => {
       setUsers((prev) => prev.map((u) => (u.id === p.userId ? { ...u, status: p.status } : u)));
     };
-    const onStart = (p: { channelId: string; callSign: string; displayName: string }) => {
-      if (p.channelId === selected) setSpeaker(`${p.callSign} · ${p.displayName}`);
+    const onStart = (p: { channelId: string; callSign: string; displayName: string; userId?: string }) => {
+      if (p.channelId !== selected) return;
+      setSpeaker(`${p.callSign} · ${p.displayName}`);
+      if (p.userId !== user?.id) radioTones.start();
     };
-    const onEnd = (p: { channelId: string }) => {
-      if (p.channelId === selected) {
-        setSpeaker("");
-        setTalking(false);
-      }
+    const onEnd = (p: { channelId: string; userId?: string }) => {
+      if (p.channelId !== selected) return;
+      setSpeaker("");
+      setTalking(false);
+      if (p.userId !== user?.id) radioTones.end();
     };
     const onAudio = (data: ArrayBuffer) => pttAudio.playChunk(data);
     const onMsg = (msg: { channelId: string } & (typeof messages)[0]) => {
       if (msg.channelId === selected) setMessages((m) => [...m.slice(-50), msg]);
     };
-    const onEmergency = (a: { callSign: string; displayName: string; note: string; lat?: number; lng?: number }) => {
+    const onEmergency = (a: { callSign: string; displayName: string; note: string }) => {
+      radioTones.emergency();
       setAlert(`חירום · ${a.callSign} ${a.displayName}: ${a.note}`);
+    };
+    const onDenied = (p: { reason?: string }) => {
+      radioTones.error();
+      setAlert(p.reason || "הערוץ תפוס");
     };
 
     socket.on("location:broadcast", onLoc);
@@ -76,11 +86,14 @@ export function DispatchPage() {
     socket.on("ptt:audio", onAudio);
     socket.on("message:new", onMsg);
     socket.on("emergency:alert", onEmergency);
+    socket.on("ptt:denied", onDenied);
     socket.on("ptt:granted", async () => {
+      radioTones.start();
       setTalking(true);
       try {
         await pttAudio.startTalk(socket, selected);
       } catch {
+        radioTones.error();
         setAlert("אין גישה למיקרופון");
       }
     });
@@ -93,8 +106,9 @@ export function DispatchPage() {
       socket.off("ptt:audio", onAudio);
       socket.off("message:new", onMsg);
       socket.off("emergency:alert", onEmergency);
+      socket.off("ptt:denied", onDenied);
     };
-  }, [token, selected]);
+  }, [token, selected, user?.id]);
 
   useEffect(() => {
     if (!selected || !token) return;
@@ -105,14 +119,21 @@ export function DispatchPage() {
   const online = users.filter((u) => u.status !== "offline").length;
   const withLoc = users.filter((u) => u.lat != null && u.lng != null);
   const current = useMemo(() => channels.find((c) => c.id === selected), [channels, selected]);
+  const roster = useMemo(() => {
+    const s = rosterQ.trim().toLowerCase();
+    const list = !s ? users : users.filter((u) => [u.callSign, u.displayName, u.unit?.name].some((v) => (v ?? "").toLowerCase().includes(s)));
+    return [...list].sort((a, b) => Number(b.status === "emergency") - Number(a.status === "emergency") || a.callSign.localeCompare(b.callSign, "he"));
+  }, [users, rosterQ]);
 
   function pttDown() {
     if (!selected) return;
+    radioTones.unlock();
     connectSocket(token!).emit("ptt:request", { channelId: selected });
   }
   function pttUp() {
     pttAudio.stopTalk();
     if (selected) connectSocket(token!).emit("ptt:release", { channelId: selected });
+    if (talking) radioTones.end();
     setTalking(false);
   }
 
@@ -121,12 +142,12 @@ export function DispatchPage() {
       <div className="topbar">
         <div>
           <h2 style={{ margin: 0 }}>מוקד דיספאצר</h2>
-          <div style={{ color: "var(--muted)" }}>{user?.displayName} · {user?.callSign}</div>
+          <div style={{ color: "var(--muted)" }}>{user?.displayName} · ניטור כוחות ושידור לערוץ</div>
         </div>
-        <div className="grid-3" style={{ minWidth: 420 }}>
+        <div className="grid-3" style={{ minWidth: 380 }}>
           <div className="stat"><span>מחוברים</span><b>{online}</b></div>
           <div className="stat"><span>עם מיקום</span><b>{withLoc.length}</b></div>
-          <div className="stat"><span>ערוץ</span><b>{current?.code ?? "-"}</b></div>
+          <div className="stat"><span>ערוץ פעיל</span><b>{current?.code ?? "-"}</b></div>
         </div>
       </div>
       {alert ? (
@@ -135,6 +156,7 @@ export function DispatchPage() {
           <button className="btn" onClick={() => setAlert(null)}>סגור</button>
         </div>
       ) : null}
+      {speaker ? <div className="talking-banner">באוויר: {speaker} · {current?.name}</div> : null}
       <div className="grid-2">
         <div className="card" style={{ padding: 0 }}>
           <div className="map-wrap">
@@ -146,7 +168,7 @@ export function DispatchPage() {
                   center={[u.lat!, u.lng!]}
                   radius={u.status === "emergency" ? 14 : 9}
                   pathOptions={{
-                    color: u.status === "emergency" ? "#ef4444" : u.status === "talking" ? "#f59e0b" : u.unit?.color || "#3b82f6",
+                    color: u.status === "emergency" ? "#c81e1e" : u.status === "talking" ? "#c9a227" : u.unit?.color || "#2563eb",
                     fillOpacity: 0.9,
                   }}
                 >
@@ -164,7 +186,7 @@ export function DispatchPage() {
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <b>ערוצי קשר</b>
-              <span style={{ color: "var(--muted)" }}>{speaker || "שקט"}</span>
+              <span style={{ color: "var(--muted)" }}>{speaker || "שקט בקו"}</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {channels.map((c) => (
@@ -180,13 +202,16 @@ export function DispatchPage() {
               onMouseUp={pttUp}
               onMouseLeave={() => talking && pttUp()}
             >
-              <Radio size={18} style={{ verticalAlign: "middle" }} /> {talking ? "משדר..." : "PTT מוקד"}
+              <Radio size={18} style={{ verticalAlign: "middle" }} /> {talking ? "משדר — שחררו לסיום" : "PTT מוקד"}
             </button>
           </div>
           <div className="card">
-            <b>כוחות</b>
-            <div style={{ maxHeight: 220, overflow: "auto", marginTop: 8 }}>
-              {users.map((u) => (
+            <div className="toolbar" style={{ marginBottom: 8 }}>
+              <b style={{ flex: 1 }}>כוחות</b>
+              <input className="input" style={{ maxWidth: 180 }} placeholder="חיפוש ניידת..." value={rosterQ} onChange={(e) => setRosterQ(e.target.value)} />
+            </div>
+            <div style={{ maxHeight: 220, overflow: "auto" }}>
+              {roster.map((u) => (
                 <div key={u.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
                   <span>
                     <span className={`dot ${u.status === "emergency" ? "em" : u.status === "talking" ? "talk" : u.status === "offline" ? "" : "on"}`} />
@@ -201,14 +226,14 @@ export function DispatchPage() {
             <b>הודעות ערוץ</b>
             <div className="chat-log">
               {messages.map((m) => (
-                <div key={m.id} className="bubble" style={{ borderRight: m.kind === "emergency" ? "3px solid #ef4444" : undefined }}>
+                <div key={m.id} className="bubble" style={{ borderRight: m.kind === "emergency" ? "3px solid var(--brand)" : undefined }}>
                   <b>{m.user?.callSign}:</b> {m.body}
                 </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="שידור טקסט" />
-              <button className="btn" onClick={() => {
+              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="שידור טקסט לכוחות" />
+              <button className="btn gold" onClick={() => {
                 if (!text.trim() || !selected) return;
                 connectSocket(token!).emit("message:send", { channelId: selected, body: text.trim() });
                 setText("");

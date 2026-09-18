@@ -59,18 +59,21 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         }
         socket.on("ptt:denied", Emitter.Listener { args ->
             val reason = (args.firstOrNull() as? JSONObject)?.optString("reason") ?: "נדחה"
+            RadioTones.error()
             runOnUiThread { binding.statusText.text = reason }
         })
         socket.on("ptt:start", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
             if (o.optString("channelId") == selected) {
+                RadioTones.start()
                 runOnUiThread { binding.statusText.text = "באוויר: ${o.optString("callSign")}" }
             }
         })
         socket.on("ptt:end") {
             talking = false
             RadioBus.audio.stopCapture()
-            runOnUiThread { binding.statusText.text = "מוכן" }
+            RadioTones.end()
+            runOnUiThread { binding.statusText.text = "מוכן לקשר" }
         }
         socket.on("ptt:audio", Emitter.Listener { args ->
             val data = args.firstOrNull() as? ByteArray ?: return@Listener
@@ -78,6 +81,7 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         })
         socket.on("emergency:alert", Emitter.Listener { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@Listener
+            RadioTones.emergency()
             runOnUiThread { binding.statusText.text = "חירום: ${o.optString("callSign")}" }
         })
 
@@ -98,12 +102,11 @@ class RadioActivity : AppCompatActivity(), LocationListener {
         }
 
         binding.emergencyBtn.setOnClickListener {
+            RadioTones.emergency()
             socket.emit("emergency", JSONObject().put("note", "קריאת חירום מהשטח"))
         }
-        binding.logoutBtn.setOnClickListener {
-            session.clearAuth()
-            RadioBus.socket?.disconnect()
-            startActivity(Intent(this, LoginActivity::class.java))
+        binding.homeBtn.setOnClickListener {
+            startActivity(Intent(this, HomeActivity::class.java))
             finish()
         }
 

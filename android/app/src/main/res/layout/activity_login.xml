@@ -7,16 +7,23 @@
     android:layout_height="match_parent"
     android:gravity="center">
 
+    <ImageView
+        android:src="@drawable/logo"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:contentDescription="@string/app_name" />
+
     <TextView
-        android:text="קשר"
-        android:textSize="36sp"
+        android:text="יוסי אמבולנס"
+        android:textSize="28sp"
         android:textStyle="bold"
-        android:textColor="@color/amber"
+        android:textColor="@color/brand"
+        android:layout_marginTop="12dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
     <TextView
-        android:text="מערכת PTT ארגונית"
+        android:text="מערכת קשר"
         android:textColor="@color/muted"
         android:layout_marginBottom="24dp"
         android:layout_width="wrap_content"
@@ -24,7 +31,7 @@
 
     <EditText
         android:id="@+id/serverUrl"
-        android:hint="כתובת שרת, למשל http://192.168.1.10:8080"
+        android:hint="כתובת שרת, למשל http://10.0.2.2:8080"
         android:textColor="@color/text"
         android:textColorHint="@color/muted"
         android:background="@color/panel"
@@ -60,12 +67,13 @@
     <Button
         android:id="@+id/loginBtn"
         android:text="כניסה"
+        android:backgroundTint="@color/brand"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
     <TextView
         android:id="@+id/errorText"
-        android:textColor="#FCA5A5"
+        android:textColor="@color/brand"
         android:layout_marginTop="12dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
