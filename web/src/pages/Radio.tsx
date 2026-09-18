@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Channel, type User } from "../api";
 import { pttAudio } from "../audio";
-import { COMPANY } from "../brand";
+import { useBranding } from "../branding";
 import { parsePttAudio } from "../pcm";
 import { isGroupKind, roleLabel } from "../roles";
 import { connectSocket } from "../socket";
@@ -13,6 +13,7 @@ type CallMode = "group" | "direct";
 
 export function RadioPage() {
   const { token, user } = useAuth();
+  const { name, logoUrl } = useBranding();
   const nav = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [people, setPeople] = useState<User[]>([]);
@@ -203,7 +204,7 @@ export function RadioPage() {
   }
 
   function emergency() {
-    if (!confirm("לשלוח קריאת חירום למוקד יוסי אמבולנס?")) return;
+    if (!confirm(`לשלוח קריאת חירום למוקד ${name}?`)) return;
     radioTones.emergency();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -221,11 +222,11 @@ export function RadioPage() {
     <div className="ptt-wrap">
       <div className="ptt-head">
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <img src={COMPANY.logo} alt="" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+          <img src={logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
           <div>
             <b>{user?.callSign}</b>
             <div style={{ color: "var(--muted)", fontSize: 13 }}>
-              {COMPANY.name} · {roleLabel(user?.role)} · {user?.displayName}
+              {name} · {roleLabel(user?.role)} · {user?.displayName}
             </div>
           </div>
         </div>

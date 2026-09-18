@@ -8,12 +8,14 @@
     android:gravity="center">
 
     <ImageView
+        android:id="@+id/logoView"
         android:src="@drawable/logo"
         android:layout_width="96dp"
         android:layout_height="96dp"
         android:contentDescription="@string/app_name" />
 
     <TextView
+        android:id="@+id/companyName"
         android:text="יוסי אמבולנס"
         android:textSize="28sp"
         android:textStyle="bold"
@@ -23,6 +25,7 @@
         android:layout_height="wrap_content" />
 
     <TextView
+        android:id="@+id/companyProduct"
         android:text="מערכת קשר"
         android:textColor="@color/muted"
         android:layout_marginBottom="24dp"

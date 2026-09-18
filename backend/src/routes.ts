@@ -11,6 +11,7 @@ import {
 } from "./auth.js";
 import { audit, loadUser, publicUser } from "./util.js";
 import { getOrCreateDirect } from "./direct.js";
+import { readBranding, readLogo, writeBranding } from "./branding.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -88,6 +89,32 @@ async function setMemberships(
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/health", async () => ({ ok: true, service: "kesher" }));
+
+  app.get("/api/branding", async () => readBranding());
+
+  app.get("/api/branding/logo", async (_req, reply) => {
+    const logo = await readLogo();
+    if (!logo) return reply.redirect("/logo.png");
+    reply.header("Cache-Control", "no-cache");
+    return reply.type(logo.mime).send(logo.bytes);
+  });
+
+  app.put("/api/branding", async (req) => {
+    const auth = await requireUser(req);
+    requireRole(auth, ["admin"]);
+    const body = z
+      .object({
+        name: z.string().min(1).max(80).optional(),
+        product: z.string().max(80).optional(),
+        logoBase64: z.string().min(1).nullable().optional(),
+        logoMime: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif"]).optional(),
+        clearLogo: z.boolean().optional(),
+      })
+      .parse(req.body);
+    const branding = await writeBranding(body);
+    await audit(auth.id, "branding.update", branding.name);
+    return branding;
+  });
 
   app.post("/api/auth/login", async (req, reply) => {
     const body = loginSchema.parse(req.body);

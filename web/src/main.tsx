@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/Dashboard";
 import { DispatchPage } from "./pages/Dispatch";
 import { LoginPage } from "./pages/Login";
 import { RadioPage } from "./pages/Radio";
+import { SettingsPage } from "./pages/Settings";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -19,6 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/dispatch" element={<DispatchPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/radio" element={<RadioPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -10,9 +10,18 @@ data class Channel(val id: String, val name: String, val code: String, val kind:
 data class Contact(val id: String, val name: String, val callSign: String, val role: String, val status: String)
 
 object Api {
-    fun login(base: String, username: String, password: String): JSONObject {
-        val body = JSONObject().put("username", username).put("password", password)
-        return request(base, "/api/auth/login", "POST", body, null)
+    fun branding(base: String): JSONObject {
+        return request(base, "/api/branding", "GET", null, null)
+    }
+
+    fun logoBitmap(base: String, path: String): android.graphics.Bitmap? {
+        if (path.isBlank() || path == "/logo.png" || !path.startsWith("/api/")) return null
+        val conn = URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
+        conn.connectTimeout = 12000
+        conn.readTimeout = 12000
+        conn.instanceFollowRedirects = true
+        if (conn.responseCode >= 400) return null
+        return conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
     }
 
     fun channels(base: String, token: String): List<Channel> {
