@@ -310,7 +310,18 @@ export function RadioPage() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="הודעת טקסט" />
+          <input
+            className="input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                sendMsg();
+              }
+            }}
+            placeholder="הודעת טקסט"
+          />
           <button className="btn" onClick={sendMsg}>שלח</button>
         </div>
       </div>

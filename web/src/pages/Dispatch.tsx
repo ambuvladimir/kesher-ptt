@@ -164,6 +164,12 @@ export function DispatchPage() {
     setTalking(false);
   }
 
+  function sendMsg() {
+    if (!text.trim() || !selected) return;
+    connectSocket(token!).emit("message:send", { channelId: selected, body: text.trim() });
+    setText("");
+  }
+
   return (
     <div>
       <div className="topbar">
@@ -278,12 +284,19 @@ export function DispatchPage() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="שידור טקסט לכוחות" />
-              <button className="btn gold" onClick={() => {
-                if (!text.trim() || !selected) return;
-                connectSocket(token!).emit("message:send", { channelId: selected, body: text.trim() });
-                setText("");
-              }}>שלח</button>
+              <input
+                className="input"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    sendMsg();
+                  }
+                }}
+                placeholder="שידור טקסט לכוחות"
+              />
+              <button className="btn gold" onClick={sendMsg}>שלח</button>
             </div>
           </div>
         </div>
